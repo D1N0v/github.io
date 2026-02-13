@@ -9,21 +9,34 @@
 
             const movie = e.data.movie;
 
-            // Перевіряємо чи є прогрес
-            const progress = Lampa.Timeline && Lampa.Timeline.get(movie);
+            // перевіряємо чи є запис у continues
+            const continues = Lampa.Favorite.continues();
+            const item = continues.find(i => i.id == movie.id);
 
-            if (!progress || progress.percent < 5 || progress.percent >= 95) return;
+            if (!item) return;
 
-            Lampa.Listener.send('full_start', {
-                title: '▶ Продовжити перегляд',
-                icon: 'play_arrow',
-                onSelect: function() {
+            // чекаємо поки намалюються кнопки
+            setTimeout(function(){
 
-                    // Запускаємо стандартний механізм
+                const button = $(
+                    `<div class="button selector continue-btn">
+                        <div class="button__icon">
+                            <svg viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M8 5v14l11-7z"/>
+                            </svg>
+                        </div>
+                        <div class="button__text">Продовжити</div>
+                    </div>`
+                );
+
+                button.on('hover:enter', function(){
                     Lampa.Player.play(movie);
+                });
 
-                }
-            });
+                $('.full-start').after(button);
+
+            },300);
+
         });
     }
 
