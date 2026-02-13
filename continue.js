@@ -1,21 +1,23 @@
-(function() {
+(function () {
     'use strict';
 
-    function init() {
+    function startPlugin() {
 
-        Lampa.Listener.follow('full', function(e) {
+        Lampa.Listener.follow('full', function (e) {
+
             if (e.type !== 'complite') return;
 
-            // Перевіряємо кожні 100мс, поки не з'явиться контейнер для кнопок
-            const interval = setInterval(function() {
-                const container = document.querySelector('.full-start');
+            // Невелика затримка щоб DOM точно намалювався
+            setTimeout(function () {
+
+                let container = document.querySelector('.full-start');
                 if (!container) return;
 
-                clearInterval(interval); // контейнер знайшли — зупиняємо чекання
+                // Якщо кнопка вже існує — не дублюємо
+                if (document.querySelector('.continue-test-btn')) return;
 
-                // Створюємо кнопку
-                const button = document.createElement('div');
-                button.className = 'button selector my-continue-btn';
+                let button = document.createElement('div');
+                button.className = 'button selector continue-test-btn';
                 button.innerHTML = `
                     <div class="button__icon">
                         <svg viewBox="0 0 24 24">
@@ -25,21 +27,23 @@
                     <div class="button__text">Продовжити</div>
                 `;
 
-                // Для тесту — повідомлення при натисканні
-                button.addEventListener('hover:enter', function() {
-                    alert('Кнопка натиснута!');
+                // Підтримка пульта / клавіатури
+                button.addEventListener('hover:enter', function () {
+                    Lampa.Noty.show('Кнопка працює');
                 });
 
-                // Додаємо кнопку після існуючої
+                // Підтримка миші
+                button.addEventListener('click', function () {
+                    Lampa.Noty.show('Кнопка працює');
+                });
+
                 container.after(button);
 
-            }, 100);
-
+            }, 500);
         });
-
     }
 
-    if (window.Lampa) init();
-    else document.addEventListener('lampa', init);
+    if (window.Lampa) startPlugin();
+    else document.addEventListener('lampa', startPlugin);
 
 })();
