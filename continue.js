@@ -13,6 +13,22 @@
             return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
+    function findContinue(movie) {
+
+        const continues = Lampa.Favorite.continues();
+
+        // шукаємо по всіх можливих варіантах id
+        let item = continues
+            .filter(i =>
+                i.id == movie.id ||
+                i.card_id == movie.id ||
+                i.original_id == movie.id
+            )
+            .sort((a, b) => (b.time || 0) - (a.time || 0))[0];
+
+        return item || null;
+    }
+
     function addContinueButton(movie) {
 
         const container = document.querySelector('.full-start-new__buttons');
@@ -20,8 +36,7 @@
 
         if (document.querySelector('.button--continue')) return;
 
-        const continues = Lampa.Favorite.continues();
-        const item = continues.find(i => i.id == movie.id);
+        const item = findContinue(movie);
 
         let subText = 'З початку';
         let startTime = 0;
@@ -60,7 +75,7 @@
             Lampa.Player.play(movie, startTime);
         });
 
-        // Робимо кнопку першою
+        // 👉 Робимо кнопку першою
         container.prepend(button);
     }
 
