@@ -23,14 +23,17 @@
         const continues = Lampa.Favorite.continues();
         const item = continues.find(i => i.id == movie.id);
 
-        if (!item) return; // якщо немає збереженого перегляду — кнопку не показуємо
+        let subText = 'З початку';
+        let startTime = 0;
 
-        let subText = '';
+        if (item && item.time) {
+            startTime = item.time;
 
-        if (item.season && item.episode) {
-            subText = `S${item.season}E${item.episode} • ${formatTime(item.time)}`;
-        } else {
-            subText = formatTime(item.time);
+            if (item.season && item.episode) {
+                subText = `S${item.season}E${item.episode} • ${formatTime(item.time)}`;
+            } else {
+                subText = formatTime(item.time);
+            }
         }
 
         const button = document.createElement('div');
@@ -44,21 +47,20 @@
             <div class="continue-subtext">${subText}</div>
         `;
 
-        // Стилі підпису
-        button.querySelector('.continue-subtext').style.fontSize = '12px';
-        button.querySelector('.continue-subtext').style.opacity = '0.6';
-        button.querySelector('.continue-subtext').style.marginTop = '4px';
+        const sub = button.querySelector('.continue-subtext');
+        sub.style.fontSize = '12px';
+        sub.style.opacity = '0.6';
+        sub.style.marginTop = '4px';
 
-        // Запуск з моменту зупинки
         button.addEventListener('hover:enter', function () {
-            Lampa.Player.play(movie, item.time || 0);
+            Lampa.Player.play(movie, startTime);
         });
 
         button.addEventListener('click', function () {
-            Lampa.Player.play(movie, item.time || 0);
+            Lampa.Player.play(movie, startTime);
         });
 
-        // 👉 Робимо кнопку першою
+        // Робимо кнопку першою
         container.prepend(button);
     }
 
@@ -70,7 +72,7 @@
 
             setTimeout(function () {
                 addContinueButton(e.data.movie);
-            }, 300);
+            }, 400);
 
         });
     }
