@@ -1,36 +1,35 @@
 (function () {
     'use strict';
 
-    function addButton(movie) {
+    function addContinueButton() {
 
-        let buttons = document.querySelector('.full__buttons');
-        if (!buttons) return;
+        const container = document.querySelector('.full-start-new__buttons');
+        if (!container) return;
 
-        // не додаємо двічі
-        if (document.querySelector('.continue-btn')) return;
+        // Не дублюємо кнопку
+        if (document.querySelector('.button--continue')) return;
 
-        let btn = document.createElement('div');
-        btn.className = 'full__button selector continue-btn';
-        btn.innerHTML = `
-            <div class="full__button-icon">
-                <svg viewBox="0 0 24 24">
-                    <path fill="currentColor" d="M8 5v14l11-7z"/>
-                </svg>
-            </div>
-            <div class="full__button-text">Продовжити</div>
+        const button = document.createElement('div');
+        button.className = 'full-start__button selector button--continue';
+
+        button.innerHTML = `
+            <svg viewBox="0 0 24 24">
+                <path fill="currentColor" d="M8 5v14l11-7z"/>
+            </svg>
+            <span>Продовжити</span>
         `;
 
-        // підтримка пульта
-        btn.addEventListener('hover:enter', function () {
+        // Підтримка пульта
+        button.addEventListener('hover:enter', function () {
             Lampa.Noty.show('Продовжити натиснуто');
         });
 
-        // підтримка миші
-        btn.addEventListener('click', function () {
+        // Підтримка миші
+        button.addEventListener('click', function () {
             Lampa.Noty.show('Продовжити натиснуто');
         });
 
-        buttons.appendChild(btn);
+        container.appendChild(button);
     }
 
     function init() {
@@ -39,10 +38,8 @@
 
             if (e.type !== 'complite') return;
 
-            // невелика затримка щоб DOM повністю намалювався
-            setTimeout(function () {
-                addButton(e.data.movie);
-            }, 300);
+            // Чекаємо поки кнопки точно намалюються
+            setTimeout(addContinueButton, 200);
 
         });
     }
