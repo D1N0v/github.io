@@ -1,49 +1,53 @@
 (function () {
     'use strict';
 
-    function startPlugin() {
+    function addButton(movie) {
+
+        let buttons = document.querySelector('.full__buttons');
+        if (!buttons) return;
+
+        // не додаємо двічі
+        if (document.querySelector('.continue-btn')) return;
+
+        let btn = document.createElement('div');
+        btn.className = 'full__button selector continue-btn';
+        btn.innerHTML = `
+            <div class="full__button-icon">
+                <svg viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M8 5v14l11-7z"/>
+                </svg>
+            </div>
+            <div class="full__button-text">Продовжити</div>
+        `;
+
+        // підтримка пульта
+        btn.addEventListener('hover:enter', function () {
+            Lampa.Noty.show('Продовжити натиснуто');
+        });
+
+        // підтримка миші
+        btn.addEventListener('click', function () {
+            Lampa.Noty.show('Продовжити натиснуто');
+        });
+
+        buttons.appendChild(btn);
+    }
+
+    function init() {
 
         Lampa.Listener.follow('full', function (e) {
 
             if (e.type !== 'complite') return;
 
-            // Невелика затримка щоб DOM точно намалювався
+            // невелика затримка щоб DOM повністю намалювався
             setTimeout(function () {
+                addButton(e.data.movie);
+            }, 300);
 
-                let container = document.querySelector('.full-start');
-                if (!container) return;
-
-                // Якщо кнопка вже існує — не дублюємо
-                if (document.querySelector('.continue-test-btn')) return;
-
-                let button = document.createElement('div');
-                button.className = 'button selector continue-test-btn';
-                button.innerHTML = `
-                    <div class="button__icon">
-                        <svg viewBox="0 0 24 24">
-                            <path fill="currentColor" d="M8 5v14l11-7z"/>
-                        </svg>
-                    </div>
-                    <div class="button__text">Продовжити</div>
-                `;
-
-                // Підтримка пульта / клавіатури
-                button.addEventListener('hover:enter', function () {
-                    Lampa.Noty.show('Кнопка працює');
-                });
-
-                // Підтримка миші
-                button.addEventListener('click', function () {
-                    Lampa.Noty.show('Кнопка працює');
-                });
-
-                container.after(button);
-
-            }, 500);
         });
     }
 
-    if (window.Lampa) startPlugin();
-    else document.addEventListener('lampa', startPlugin);
+    if (window.Lampa) init();
+    else document.addEventListener('lampa', init);
 
 })();
