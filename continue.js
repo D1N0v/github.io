@@ -1,51 +1,56 @@
 (function () {
     'use strict';
 
-    // --- Отримуємо серію з максимальним прогресом ---
-    function getEpisodeProgress() {
-        const episodes = document.querySelectorAll('.season-episode__body');
-        if (!episodes.length) return null;
+    // Отримуємо реальний прогрес з Timeline API
+    function getRealProgress(movie) {
+        if (!window.Lampa || !Lampa.Timeline) return null;
 
         let best = null;
 
-        episodes.forEach(ep => {
-            // шукаємо внутрішній прогрес
-            const progressEl = ep.querySelector('.season-episode__timeline div div');
-            if (!progressEl) return;
+        // Перебираємо серії
+        document.querySelectorAll('.season-episode__body').forEach(ep => {
+            const season = ep.querySelector('.season-episode__season')?.textContent.trim() || '';
+            const episode = ep.querySelector('.season-episode__episode')?.textContent.trim() || '';
 
-            const styleWidth = progressEl.style.width || '';
-            let percent = 0;
+            // Формуємо ключ (як у внутрішній логіці Lampa)
+            const hashKey = Lampa.Utils.hash([season, episode, movie.original_title].join(''));
 
-            if (styleWidth.includes('%')) {
-                percent = parseInt(styleWidth.replace('%', '')) || 0;
-            }
+            // Забираємо конкретний прогрес
+            const state = Lampa.Timeline.view(hashKey);
 
-            if (percent <= 0) return;
-
-            if (!best || percent > best.percent) {
-                const title = ep.querySelector('.season-episode__title')?.textContent?.trim() || '';
-                const time = ep.querySelector('.season-episode__time')?.textContent?.trim() || '';
-                best = { title, time, percent };
+            if (state && state.percent > 0) {
+                if (!best || state.percent > best.percent) {
+                    best = {
+                        season,
+                        episode,
+                        percent: state.percent,
+                        time: state.time,
+                        duration: state.duration,
+                        hashKey
+                    };
+                }
             }
         });
 
         return best;
     }
 
-    // --- Додаємо кнопку "Продовжити" ---
+    // Створюємо кнопку «Продовжити»
     function addContinueButton(movie) {
         const container = document.querySelector('.full-start-new__buttons');
         if (!container) return;
         if (document.querySelector('.button--continue')) return;
 
-        const progress = getEpisodeProgress();
+        const progress = getRealProgress(movie);
+
         let subText = 'З початку';
         if (progress) {
-            subText = `${progress.title} • ${progress.time} • ${progress.percent}%`;
+            subText = `Сезон ${progress.season} • Епізод ${progress.episode} • ${progress.percent}%`;
         }
 
         const button = document.createElement('div');
         button.className = 'full-start__button selector button--continue';
+
         button.innerHTML = `
             <svg viewBox="0 0 24 24">
                 <path fill="currentColor" d="M8 5v14l11-7z"/>
@@ -63,32 +68,38 @@
         sub.style.overflow = 'hidden';
         sub.style.textOverflow = 'ellipsis';
 
-        button.addEventListener('hover:enter', () => Lampa.Player.play(movie));
-        button.addEventListener('click', () => Lampa.Player.play(movie));
+        const playHandler = () => {
+            if (progress) {
+                Lampa.Player.play(movie, progress.time);
+            } else {
+                Lampa.Player.play(movie);
+            }
+        };
 
-        // Кнопка стає першою
+        button.addEventListener('hover:enter', playHandler);
+        button.addEventListener('click', playHandler);
+
         container.prepend(button);
     }
 
-    // --- Чекаємо поки з'являться елементи серій ---
+    // Чекаємо, поки DOM сезону/серій підвантажиться
     function waitForEpisodes(movie) {
         let tries = 0;
+
         const interval = setInterval(() => {
             tries++;
-            const progressFound = document.querySelector('.season-episode__timeline div div');
-            if (progressFound || tries > 50) { // пробуємо до 50 разів (≈15 секунд)
+            const ep = document.querySelector('.season-episode__body');
+            if (ep || tries > 50) {
                 clearInterval(interval);
                 addContinueButton(movie);
             }
         }, 300);
     }
 
-    // --- Ініціалізація плагіна ---
+    // Ініціалізація
     function init() {
-        Lampa.Listener.follow('full', (e) => {
+        Lampa.Listener.follow('full', e => {
             if (e.type !== 'complite') return;
-
-            // невелика пауза щоб намалювались кнопки
             setTimeout(() => waitForEpisodes(e.data.movie), 400);
         });
     }
