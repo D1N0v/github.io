@@ -1,32 +1,27 @@
 (function () {
     'use strict';
 
-    function formatTime(sec) {
-        sec = Math.floor(sec || 0);
-        let h = Math.floor(sec / 3600);
-        let m = Math.floor((sec % 3600) / 60);
-        let s = sec % 60;
+    function getEpisodeProgress() {
 
-        if (h > 0)
-            return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        else
-            return `${m}:${s.toString().padStart(2, '0')}`;
-    }
+        const episode = document.querySelector('.season-episode__body');
+        if (!episode) return null;
 
-    function findContinue(movie) {
+        const title = episode.querySelector('.season-episode__title')?.textContent || '';
+        const time = episode.querySelector('.season-episode__time')?.textContent || '';
 
-        const continues = Lampa.Favorite.continues();
+        const progressEl = episode.querySelector('.time-line > div');
+        if (!progressEl) return null;
 
-        // шукаємо по всіх можливих варіантах id
-        let item = continues
-            .filter(i =>
-                i.id == movie.id ||
-                i.card_id == movie.id ||
-                i.original_id == movie.id
-            )
-            .sort((a, b) => (b.time || 0) - (a.time || 0))[0];
+        const width = progressEl.style.width || '0%';
+        const percent = parseInt(width.replace('%', '')) || 0;
 
-        return item || null;
+        if (percent <= 0) return null;
+
+        return {
+            title,
+            time,
+            percent
+        };
     }
 
     function addContinueButton(movie) {
@@ -36,19 +31,12 @@
 
         if (document.querySelector('.button--continue')) return;
 
-        const item = findContinue(movie);
+        const progress = getEpisodeProgress();
 
         let subText = 'З початку';
-        let startTime = 0;
 
-        if (item && item.time) {
-            startTime = item.time;
-
-            if (item.season && item.episode) {
-                subText = `S${item.season}E${item.episode} • ${formatTime(item.time)}`;
-            } else {
-                subText = formatTime(item.time);
-            }
+        if (progress) {
+            subText = `${progress.title} • ${progress.time} • ${progress.percent}%`;
         }
 
         const button = document.createElement('div');
@@ -66,16 +54,19 @@
         sub.style.fontSize = '12px';
         sub.style.opacity = '0.6';
         sub.style.marginTop = '4px';
+        sub.style.maxWidth = '160px';
+        sub.style.whiteSpace = 'nowrap';
+        sub.style.overflow = 'hidden';
+        sub.style.textOverflow = 'ellipsis';
 
         button.addEventListener('hover:enter', function () {
-            Lampa.Player.play(movie, startTime);
+            Lampa.Player.play(movie);
         });
 
         button.addEventListener('click', function () {
-            Lampa.Player.play(movie, startTime);
+            Lampa.Player.play(movie);
         });
 
-        // 👉 Робимо кнопку першою
         container.prepend(button);
     }
 
@@ -85,9 +76,10 @@
 
             if (e.type !== 'complite') return;
 
+            // чекаємо поки серії намалюються
             setTimeout(function () {
                 addContinueButton(e.data.movie);
-            }, 400);
+            }, 600);
 
         });
     }
