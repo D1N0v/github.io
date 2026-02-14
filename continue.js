@@ -1,47 +1,33 @@
 (function () {
     'use strict';
 
-    const STORAGE_KEY = 'lampa_continue_data';
-
-    // --- Робота з localStorage ---
-    function getData() {
-        try {
-            return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-        } catch (e) {
-            return {};
-        }
-    }
-
-    function setData(data) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    }
-
-    function saveProgress(movieId, seriesId, time, percent) {
-        const data = getData();
-        if (!data[movieId]) data[movieId] = {};
-        data[movieId][seriesId || 'movie'] = { time, percent, timestamp: Date.now() };
-        setData(data);
-        console.log('Прогрес збережено', movieId, seriesId, time, percent);
-    }
-
-    function getProgress(movieId, seriesId) {
-        const data = getData();
-        return (data[movieId] && data[movieId][seriesId || 'movie']) || null;
-    }
-
-    // --- Створення кнопки «Продовжити» ---
-    function addContinueButton(movie, seriesId) {
+    function addContinueButton(movie, season = null, episode = null) {
         const container = document.querySelector('.full-start-new__buttons');
         if (!container) return;
         if (document.querySelector('.button--continue')) return;
 
-        const state = getProgress(movie.id, seriesId);
-
-        let subText = 'З початку';
-        if (state && state.percent > 0) {
-            subText = `${state.percent}% • ${Math.floor(state.time/60)}хв ${Math.floor(state.time%60)}сек`;
+        // Формування хешу
+        let hash;
+        if (season !== null && episode !== null) {
+            // Для серіалів: добавляємо ':' тільки якщо сезон > 10
+            const separator = season > 10 ? ':' : '';
+            const hashString = [season, separator, episode, movie.original_name || movie.original_title].join('');
+            hash = Lampa.Utils.hash(hashString);
+        } else {
+            // Для фільмів
+            hash = Lampa.Utils.hash(movie.original_title || movie.title);
         }
 
+        // Отримуємо стан прогресу
+        const state = Lampa.Timeline.view(hash);
+
+        // Текст під кнопкою
+        let subText = 'З початку';
+        if (state && state.percent > 0) {
+            subText = `${state.percent}% • ${Math.floor(state.time/60)}хв ${Math.floor(state.time % 60)}сек`;
+        }
+
+        // Створюємо кнопку
         const button = document.createElement('div');
         button.className = 'full-start__button selector button--continue';
         button.innerHTML = `
@@ -63,6 +49,7 @@
             text-overflow:ellipsis;
         `;
 
+        // Функція запуску плеєра з останнього часу
         const playHandler = () => {
             if (state && state.time) Lampa.Player.play(movie, state.time);
             else Lampa.Player.play(movie);
@@ -71,25 +58,21 @@
         button.addEventListener('hover:enter', playHandler);
         button.addEventListener('click', playHandler);
 
+        // Додаємо кнопку першою
         container.prepend(button);
         console.log('Кнопка "Продовжити" додана на сторінку');
     }
 
-    // --- Ініціалізація плагіна ---
     function init() {
-        // Слухаємо події завершення перегляду фільму/серії
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
 
             const movie = e.data.movie;
-            const seriesId = e.data.seriesId || 'movie';
-            const time = e.data.time || 0;
-            const percent = e.data.percent || 0;
-
-            saveProgress(movie.id, seriesId, time, percent);
+            const season = e.data.season;   // беремо сезон, якщо серіал
+            const episode = e.data.episode; // беремо епізод, якщо серіал
 
             // Додаємо кнопку після невеликої затримки
-            setTimeout(() => addContinueButton(movie, seriesId), 300);
+            setTimeout(() => addContinueButton(movie, season, episode), 400);
         });
     }
 
