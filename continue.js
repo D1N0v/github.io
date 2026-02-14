@@ -3,30 +3,33 @@
 
     const STORAGE_KEY = 'lampa_continue_data';
 
-    function getContinueData() {
+    // --- Робота з localStorage ---
+    function getData() {
         try {
             return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-        } catch(e) {
+        } catch (e) {
             return {};
         }
     }
 
-    function setContinueData(data) {
+    function setData(data) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 
     function saveProgress(movieId, seriesId, time, percent) {
-        const data = getContinueData();
+        const data = getData();
         if (!data[movieId]) data[movieId] = {};
         data[movieId][seriesId || 'movie'] = { time, percent, timestamp: Date.now() };
-        setContinueData(data);
+        setData(data);
+        console.log('Прогрес збережено', movieId, seriesId, time, percent);
     }
 
     function getProgress(movieId, seriesId) {
-        const data = getContinueData();
+        const data = getData();
         return (data[movieId] && data[movieId][seriesId || 'movie']) || null;
     }
 
+    // --- Створення кнопки «Продовжити» ---
     function addContinueButton(movie, seriesId) {
         const container = document.querySelector('.full-start-new__buttons');
         if (!container) return;
@@ -34,7 +37,6 @@
 
         const state = getProgress(movie.id, seriesId);
 
-        // Текст під кнопкою
         let subText = 'З початку';
         if (state && state.percent > 0) {
             subText = `${state.percent}% • ${Math.floor(state.time/60)}хв ${Math.floor(state.time%60)}сек`;
@@ -50,9 +52,15 @@
             <div class="continue-subtext">${subText}</div>
         `;
 
-        button.querySelector('.continue-subtext').style.cssText = `
-            font-size:12px; opacity:0.6; margin-top:4px; max-width:170px;
-            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        const sub = button.querySelector('.continue-subtext');
+        sub.style.cssText = `
+            font-size:12px;
+            opacity:0.6;
+            margin-top:4px;
+            max-width:170px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
         `;
 
         const playHandler = () => {
@@ -67,18 +75,21 @@
         console.log('Кнопка "Продовжити" додана на сторінку');
     }
 
+    // --- Ініціалізація плагіна ---
     function init() {
-        // Слухаємо, коли користувач дивиться щось
-        Lampa.Listener.follow('player', function(e) {
-            if (e.type !== 'timeupdate') return;
-            // movieId, seriesId, поточний час, відсоток прогресу
-            saveProgress(e.data.movie.id, e.data.seriesId, e.data.time, e.data.percent);
-        });
-
-        // Додаємо кнопку на сторінку фільму/серіалу
-        Lampa.Listener.follow('full', function(e) {
+        // Слухаємо події завершення перегляду фільму/серії
+        Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
-            setTimeout(() => addContinueButton(e.data.movie, e.data.seriesId), 400);
+
+            const movie = e.data.movie;
+            const seriesId = e.data.seriesId || 'movie';
+            const time = e.data.time || 0;
+            const percent = e.data.percent || 0;
+
+            saveProgress(movie.id, seriesId, time, percent);
+
+            // Додаємо кнопку після невеликої затримки
+            setTimeout(() => addContinueButton(movie, seriesId), 300);
         });
     }
 
