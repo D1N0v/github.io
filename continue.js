@@ -1,38 +1,32 @@
 (function () {
     'use strict';
 
-    function getEpisodeProgress() {
+   function getEpisodeProgress() {
+    const episodes = document.querySelectorAll('.season-episode__body');
+    if (!episodes.length) return null;
 
-        const episodes = document.querySelectorAll('.season-episode__body');
-        if (!episodes.length) return null;
+    let best = null;
 
-        let best = null;
+    episodes.forEach(ep => {
+        // новий селектор для прогресу
+        const progressEl = ep.querySelector('.season-episode__timeline > div > div');
+        if (!progressEl) return;
 
-        episodes.forEach(ep => {
+        const width = progressEl.style.width || '0%';
+        const percent = parseInt(width.replace('%', '')) || 0;
 
-            const progressEl = ep.querySelector('.time-line > div');
-            if (!progressEl) return;
+        if (percent <= 0) return;
 
-            const width = progressEl.style.width || '0%';
-            const percent = parseInt(width.replace('%', '')) || 0;
+        if (!best || percent > best.percent) {
+            const title = ep.querySelector('.season-episode__title')?.textContent || '';
+            const time = ep.querySelector('.season-episode__time')?.textContent || '';
+            best = { title, time, percent };
+        }
+    });
 
-            if (percent <= 0) return;
+    return best;
+}
 
-            if (!best || percent > best.percent) {
-
-                const title = ep.querySelector('.season-episode__title')?.textContent || '';
-                const time = ep.querySelector('.season-episode__time')?.textContent || '';
-
-                best = {
-                    title,
-                    time,
-                    percent
-                };
-            }
-        });
-
-        return best;
-    }
 
     function addContinueButton(movie) {
 
@@ -116,3 +110,4 @@
     else document.addEventListener('lampa', init);
 
 })();
+
