@@ -1,25 +1,30 @@
 (function () {
     'use strict';
 
-   function getEpisodeProgress() {
+  function getEpisodeProgress() {
     const episodes = document.querySelectorAll('.season-episode__body');
     if (!episodes.length) return null;
 
     let best = null;
 
     episodes.forEach(ep => {
-        // новий селектор для прогресу
-        const progressEl = ep.querySelector('.season-episode__timeline > div > div');
+        // шукаємо саме внутрішній прогрес
+        const progressEl = ep.querySelector('.season-episode__timeline div div');
         if (!progressEl) return;
 
-        const width = progressEl.style.width || '0%';
-        const percent = parseInt(width.replace('%', '')) || 0;
+        const styleWidth = progressEl.style.width || '';
+        let percent = 0;
+
+        // інколи width може бути у вигляді "45%" або "45.0%"
+        if (styleWidth.includes('%')) {
+            percent = parseInt(styleWidth.replace('%','')) || 0;
+        }
 
         if (percent <= 0) return;
 
         if (!best || percent > best.percent) {
-            const title = ep.querySelector('.season-episode__title')?.textContent || '';
-            const time = ep.querySelector('.season-episode__time')?.textContent || '';
+            const title = ep.querySelector('.season-episode__title')?.textContent?.trim() || '';
+            const time = ep.querySelector('.season-episode__time')?.textContent?.trim() || '';
             best = { title, time, percent };
         }
     });
@@ -75,22 +80,19 @@
         container.prepend(button);
     }
 
-    function waitForEpisodes(movie) {
+  function waitForEpisodes(movie) {
+    let tries = 0;
 
-        // Чекаємо поки намалюються серії
-        let tries = 0;
+    const interval = setInterval(() => {
+        tries++;
 
-        const interval = setInterval(function () {
-
-            tries++;
-
-            if (document.querySelector('.season-episode__body') || tries > 20) {
-                clearInterval(interval);
-                addContinueButton(movie);
-            }
-
-        }, 300);
-    }
+        const progressFound = document.querySelector('.season-episode__timeline div div');
+        if (progressFound || tries > 50) { // пробуємо довше
+            clearInterval(interval);
+            addContinueButton(movie);
+        }
+    }, 300);
+}
 
     function init() {
 
@@ -110,4 +112,5 @@
     else document.addEventListener('lampa', init);
 
 })();
+
 
