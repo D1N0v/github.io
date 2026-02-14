@@ -3,25 +3,35 @@
 
     function getEpisodeProgress() {
 
-        const episode = document.querySelector('.season-episode__body');
-        if (!episode) return null;
+        const episodes = document.querySelectorAll('.season-episode__body');
+        if (!episodes.length) return null;
 
-        const title = episode.querySelector('.season-episode__title')?.textContent || '';
-        const time = episode.querySelector('.season-episode__time')?.textContent || '';
+        let best = null;
 
-        const progressEl = episode.querySelector('.time-line > div');
-        if (!progressEl) return null;
+        episodes.forEach(ep => {
 
-        const width = progressEl.style.width || '0%';
-        const percent = parseInt(width.replace('%', '')) || 0;
+            const progressEl = ep.querySelector('.time-line > div');
+            if (!progressEl) return;
 
-        if (percent <= 0) return null;
+            const width = progressEl.style.width || '0%';
+            const percent = parseInt(width.replace('%', '')) || 0;
 
-        return {
-            title,
-            time,
-            percent
-        };
+            if (percent <= 0) return;
+
+            if (!best || percent > best.percent) {
+
+                const title = ep.querySelector('.season-episode__title')?.textContent || '';
+                const time = ep.querySelector('.season-episode__time')?.textContent || '';
+
+                best = {
+                    title,
+                    time,
+                    percent
+                };
+            }
+        });
+
+        return best;
     }
 
     function addContinueButton(movie) {
@@ -54,7 +64,7 @@
         sub.style.fontSize = '12px';
         sub.style.opacity = '0.6';
         sub.style.marginTop = '4px';
-        sub.style.maxWidth = '160px';
+        sub.style.maxWidth = '170px';
         sub.style.whiteSpace = 'nowrap';
         sub.style.overflow = 'hidden';
         sub.style.textOverflow = 'ellipsis';
@@ -67,7 +77,25 @@
             Lampa.Player.play(movie);
         });
 
+        // 👉 Кнопка стає першою
         container.prepend(button);
+    }
+
+    function waitForEpisodes(movie) {
+
+        // Чекаємо поки намалюються серії
+        let tries = 0;
+
+        const interval = setInterval(function () {
+
+            tries++;
+
+            if (document.querySelector('.season-episode__body') || tries > 20) {
+                clearInterval(interval);
+                addContinueButton(movie);
+            }
+
+        }, 300);
     }
 
     function init() {
@@ -76,10 +104,10 @@
 
             if (e.type !== 'complite') return;
 
-            // чекаємо поки серії намалюються
+            // невелика пауза щоб намалювались кнопки
             setTimeout(function () {
-                addContinueButton(e.data.movie);
-            }, 600);
+                waitForEpisodes(e.data.movie);
+            }, 400);
 
         });
     }
