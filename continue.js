@@ -16,7 +16,10 @@
         if (!container) return;
         if (document.querySelector('.button--continue')) return;
 
-        const isSerial = movie.type === 'serial' || movie.type === 'series' || movie.serial === true;
+        const isSerial = 
+    (movie.number_of_seasons && movie.number_of_seasons > 0) ||
+    Boolean(movie.first_air_date);
+
 
         let displayText = '';
         let time = 0;
