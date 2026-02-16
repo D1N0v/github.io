@@ -16,7 +16,6 @@
         if (!container) return;
         if (document.querySelector('.button--continue')) return;
 
-        // Визначення серіалу чи фільму
         const isSerial = 
             (movie.number_of_seasons && movie.number_of_seasons > 0) ||
             Boolean(movie.first_air_date);
@@ -27,7 +26,7 @@
         let season, episode;
 
         if (isSerial) {
-            // ==== Серіал ====
+            // ==== Логіка останньої переглянутої серії ====
             const activity = Lampa.Activity.active();
             if(!activity || !activity.card) return;
 
@@ -56,12 +55,10 @@
             episode = lastEpisode.episode;
             time = lastEpisode.time;
             percent = lastEpisode.percent;
-
-            // Підпис під кнопкою
             displayText = `S${season}E${episode} • ${percent}% • ${formatTime(time)}`;
 
         } else {
-            // ==== Фільм ====
+            // ==== Для фільмів ====
             const hash = Lampa.Utils.hash(movie.original_title || movie.title);
             const state = Lampa.Timeline.view(hash);
             if(!state || state.time <=0) return;
@@ -74,6 +71,11 @@
         // ==== Створення кнопки ====
         const button = document.createElement('div');
         button.className = 'full-start__button selector button--continue';
+        button.style.display = 'flex';
+        button.style.flexDirection = 'column'; // вертикально
+        button.style.alignItems = 'center';
+        button.style.justifyContent = 'center';
+        button.style.gap = '2px'; // відступ між текстом і підписом
         button.innerHTML = `
             <svg viewBox="0 0 24 24" width="24" height="24">
                 <path fill="currentColor" d="M8 5v14l11-7z"/>
@@ -82,17 +84,14 @@
             <div class="continue-subtext">${displayText}</div>
         `;
 
-        // Стилізація підпису
         const sub = button.querySelector('.continue-subtext');
         sub.style.cssText = `
             font-size: 11px;
             opacity: 0.7;
-            margin-top: 2px;
-            max-width: 200px;
+            line-height: 1.2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            line-height: 1.2;
         `;
 
         button.addEventListener('hover:enter', ()=>playMovie(movie, season, episode, time));
@@ -106,10 +105,7 @@
     }
 
     function playMovie(movie, season, episode, time){
-        const isSerial = 
-            (movie.number_of_seasons && movie.number_of_seasons > 0) ||
-            Boolean(movie.first_air_date);
-
+        const isSerial = movie.type === 'serial' || movie.type === 'series' || movie.serial === true;
         if(isSerial && season && episode){
             if(movie.seasons && movie.seasons[season-1]){
                 const epData = movie.seasons[season-1].episodes[episode-1];
@@ -139,5 +135,5 @@
         document.addEventListener('lampa', init);
     }
 
-    console.log('🚀 Плагін "Продовжити перегляд" завантажено');
+    console.log('🚀 Плагін "Продовжити" завантажено');
 })();
