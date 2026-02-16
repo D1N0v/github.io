@@ -1,160 +1,159 @@
 (function () {
     'use strict';
 
-    function getEpisodeHash(season, episode, originalName) {
-        // Згідно з документацією: [сезон][розділювач][епізод][оригінальна_назва]
-        // Розділювач ':' додається тільки якщо сезон > 10
-        const separator = season > 10 ? ':' : '';
-        const hashString = [season, separator, episode, originalName].join('');
+    /*
+        ==========================================
+        ХЕШІ (як у Lampa)
+        ==========================================
+    */
+
+    function getMovieHash(movie) {
+        const title = movie.original_title || movie.title || '';
+        return Lampa.Utils.hash(title);
+    }
+
+    function getEpisodeHash(season, episode, originalTitle) {
+        // В Lampa separator використовується якщо season > 9
+        const separator = season > 9 ? ':' : '';
+        const hashString = season + separator + episode + originalTitle;
         return Lampa.Utils.hash(hashString);
     }
 
-    function getMovieHash(movie) {
-        // Для фільмів використовуємо оригінальну назву
-        return Lampa.Utils.hash(movie.original_title || movie.title);
-    }
+    /*
+        ==========================================
+        ПОШУК ОСТАННЬОЇ ПЕРЕГЛЯНУТОЇ СЕРІЇ
+        ==========================================
+    */
 
-    // Функція для отримання всіх збережених прогрессів
-    function getAllSavedProgress() {
-        try {
-            const profiles = Lampa.Storage.get('profiles') || {};
-            const currentProfile = Lampa.Storage.get('current_profile') || 'default';
-            const profileId = profiles[currentProfile]?.id || currentProfile;
-            
-            // Шукаємо в localStorage ключі з прогресом
-            const fileViewKey = profileId !== 'default' ? `file_view_${profileId}` : 'file_view';
-            const savedProgress = Lampa.Storage.get(fileViewKey) || {};
-            
-            console.log('Знайдено прогреси:', savedProgress);
-            return savedProgress;
-        } catch (e) {
-            console.log('Помилка отримання прогресу:', e);
-            return {};
-        }
-    }
+    function findLastWatchedEpisode(movie) {
+        if (!movie.seasons || !movie.seasons.length) return null;
 
-    // Функція для пошуку останнього переглянутого епізоду серіалу
-    function findLastWatchedForSerial(movie) {
-        try {
-            const savedProgress = getAllSavedProgress();
-            const originalName = movie.original_name || movie.title || movie.original_title;
-            
-            if (!originalName) return null;
-            
-            console.log('Пошук для серіалу:', originalName);
-            
-            let lastWatched = null;
-            let maxTime = 0;
-            
-            // Перебираємо всі збережені прогреси
-            for (let hash in savedProgress) {
-                const progress = savedProgress[hash];
-                
-                // Перевіряємо чи це епізод нашого серіалу
-                if (progress && progress.movie === originalName) {
-                    console.log('Знайдено епізод:', progress, 'hash:', hash);
-                    
-                    // Якщо це новіший епізод або більший час
-                    if (progress.last_time > maxTime) {
-                        maxTime = progress.last_time;
-                        lastWatched = {
-                            hash: hash,
-                            season: progress.season || 1,
-                            episode: progress.episode || 1,
-                            time: progress.time || 0,
-                            percent: progress.percent || 0
-                        };
-                    }
+        const originalTitle =
+            movie.original_name ||
+            movie.original_title ||
+            movie.title;
+
+        let last = null;
+        let maxTime = 0;
+
+        movie.seasons.forEach(seasonObj => {
+            if (!seasonObj.episodes) return;
+
+            seasonObj.episodes.forEach(episodeObj => {
+                const season = seasonObj.season_number;
+                const episode = episodeObj.episode_number;
+
+                const hash = getEpisodeHash(season, episode, originalTitle);
+                const state = Lampa.Timeline.view(hash);
+
+                if (state && state.time && state.time > maxTime) {
+                    maxTime = state.time;
+
+                    last = {
+                        hash,
+                        season,
+                        episode,
+                        time: state.time,
+                        percent: state.percent || 0,
+                        episodeData: episodeObj
+                    };
                 }
-            }
-            
-            return lastWatched;
-        } catch (e) {
-            console.log('Помилка пошуку серіалу:', e);
-            return null;
-        }
+            });
+        });
+
+        return last;
     }
 
-    function addContinueButton(movie, season = null, episode = null, savedState = null) {
+    /*
+        ==========================================
+        ДОДАВАННЯ КНОПКИ
+        ==========================================
+    */
+
+    function addContinueButton(movie) {
         const container = document.querySelector('.full-start-new__buttons');
         if (!container) return;
         if (document.querySelector('.button--continue')) return;
 
-        // Визначаємо чи це серіал
-        const isSerial = movie.type === 'serial' || movie.type === 'series' || movie.serial === true;
-        
-        let hash;
-        let state;
+        const isSerial =
+            movie.type === 'serial' ||
+            movie.type === 'series' ||
+            movie.serial === true;
+
+        let state = null;
+        let season = null;
+        let episode = null;
+        let episodeData = null;
         let displayInfo = '';
-        
+
+        /*
+            ====== СЕРІАЛ ======
+        */
         if (isSerial) {
-            // Для серіалів
-            const originalName = movie.original_name || movie.title || movie.original_title;
-            
-            // Якщо передано конкретний епізод
-            if (season && episode) {
-                hash = getEpisodeHash(season, episode, originalName);
-                state = Lampa.Timeline.view(hash);
-                displayInfo = `S${season}E${episode}`;
-            } else {
-                // Шукаємо останній переглянутий епізод
-                const lastWatched = savedState || findLastWatchedForSerial(movie);
-                
-                if (lastWatched) {
-                    hash = lastWatched.hash;
-                    state = {
-                        time: lastWatched.time,
-                        percent: lastWatched.percent
-                    };
-                    displayInfo = `S${lastWatched.season}E${lastWatched.episode}`;
-                    
-                    // Оновлюємо season/episode для запуску
-                    season = lastWatched.season;
-                    episode = lastWatched.episode;
-                }
-            }
+            const last = findLastWatchedEpisode(movie);
+            if (!last) return;
+
+            state = {
+                time: last.time,
+                percent: last.percent
+            };
+
+            season = last.season;
+            episode = last.episode;
+            episodeData = last.episodeData;
+            displayInfo = `S${season}E${episode}`;
+        }
+
+        /*
+            ====== ФІЛЬМ ======
+        */
+        else {
+            const hash = getMovieHash(movie);
+            const view = Lampa.Timeline.view(hash);
+
+            if (!view || !view.time) return;
+
+            state = view;
+        }
+
+        if (!state || !state.time || state.time <= 0) return;
+
+        /*
+            ==========================================
+            ФОРМУЄМО ТЕКСТ
+            ==========================================
+        */
+
+        const totalSeconds = state.time;
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = Math.floor(totalSeconds % 60);
+
+        let timeString = '';
+
+        if (hours > 0) {
+            timeString = `${hours}г ${minutes}хв`;
+        } else if (minutes > 0) {
+            timeString = `${minutes}хв ${seconds}сек`;
         } else {
-            // Для фільмів
-            hash = getMovieHash(movie);
-            state = Lampa.Timeline.view(hash);
+            timeString = `${seconds}сек`;
         }
 
-        // Якщо немає збереженого прогресу, не показуємо кнопку
-        if (!state || !state.time || state.time === 0) {
-            console.log('Немає прогресу для', isSerial ? 'серіалу' : 'фільму');
-            return;
-        }
+        const subText =
+            (displayInfo ? displayInfo + ' • ' : '') +
+            Math.round(state.percent || 0) +
+            '% • ' +
+            timeString;
 
-        // Форматуємо текст прогресу
-        let subText = '';
-        if (state.percent > 0) {
-            const totalSeconds = state.time;
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = Math.floor(totalSeconds % 60);
-            
-            let timeString = '';
-            if (hours > 0) {
-                timeString = `${hours}г ${minutes}хв`;
-            } else if (minutes > 0) {
-                timeString = `${minutes}хв ${seconds}сек`;
-            } else {
-                timeString = `${seconds}сек`;
-            }
-            
-            subText = `${displayInfo ? displayInfo + ' • ' : ''}${Math.round(state.percent)}% • ${timeString}`;
-        }
+        /*
+            ==========================================
+            СТВОРЮЄМО КНОПКУ
+            ==========================================
+        */
 
-        console.log('Додаємо кнопку з даними:', {
-            isSerial,
-            displayInfo,
-            state,
-            hash
-        });
-
-        // Створюємо кнопку
         const button = document.createElement('div');
         button.className = 'full-start__button selector button--continue';
+
         button.innerHTML = `
             <svg viewBox="0 0 24 24" width="24" height="24">
                 <path fill="currentColor" d="M8 5v14l11-7z"/>
@@ -163,45 +162,31 @@
             <div class="continue-subtext">${subText}</div>
         `;
 
-        // Стилізація підпису
         const sub = button.querySelector('.continue-subtext');
         sub.style.cssText = `
             font-size: 11px;
             opacity: 0.7;
             margin-top: 2px;
-            max-width: 200px;
+            max-width: 220px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            line-height: 1.2;
         `;
 
-        // Функція запуску плеєра з останнього часу
+        /*
+            ==========================================
+            ЗАПУСК ПЛЕЄРА
+            ==========================================
+        */
+
         const playHandler = () => {
-            if (isSerial && season && episode) {
-                // Для серіалів потрібно знайти правильний епізод
-                console.log('Запуск серіалу:', { season, episode, time: state.time });
-                
-                // Шукаємо серію в даних
-                if (movie.seasons && movie.seasons[season-1]) {
-                    const episodeData = movie.seasons[season-1].episodes[episode-1];
-                    if (episodeData) {
-                        Lampa.Player.play(movie, state.time, {
-                            season: season,
-                            episode: episode,
-                            episode_data: episodeData
-                        });
-                        return;
-                    }
-                }
-                
-                // Якщо не знайшли, пробуємо просто запустити
+            if (isSerial) {
                 Lampa.Player.play(movie, state.time, {
-                    season: season,
-                    episode: episode
+                    season,
+                    episode,
+                    episode_data: episodeData
                 });
             } else {
-                // Для фільмів просто запускаємо з часу
                 Lampa.Player.play(movie, state.time);
             }
         };
@@ -209,60 +194,36 @@
         button.addEventListener('hover:enter', playHandler);
         button.addEventListener('click', playHandler);
 
-        // Додаємо кнопку на початок контейнера
-        const existingButtons = container.querySelectorAll('.full-start__button');
-        if (existingButtons.length > 0) {
-            container.insertBefore(button, existingButtons[0]);
+        const firstButton = container.querySelector('.full-start__button');
+        if (firstButton) {
+            container.insertBefore(button, firstButton);
         } else {
             container.appendChild(button);
         }
-        
-        console.log(`✅ Кнопка "Продовжити" додана для ${isSerial ? 'серіалу' : 'фільму'}`);
+
+        console.log('✅ Кнопка "Продовжити" додана');
     }
 
+    /*
+        ==========================================
+        INIT
+        ==========================================
+    */
+
     function init() {
-        console.log('Ініціалізація плагіна "Продовжити перегляд"');
-        
+        console.log('🚀 Continue Plugin Init');
+
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
 
             const movie = e.data.movie;
-            
-            console.log('Отримано дані фільму/серіалу:', movie);
-            
-            // Затримка для завантаження DOM
+
             setTimeout(() => {
-                // Перевіряємо чи є дані про поточний епізод
-                const season = e.data.season;
-                const episode = e.data.episode;
-                
-                if (season && episode) {
-                    // Якщо відкрито конкретний епізод
-                    addContinueButton(movie, season, episode);
-                } else {
-                    // Якщо відкрито сторінку фільму/серіалу
-                    addContinueButton(movie);
-                }
-            }, 800); // Збільшив затримку для кращого завантаження
-        });
-
-        // Слухаємо подію зміни плеєра
-        Lampa.Listener.follow('player', function (e) {
-            if (e.type === 'destroy') {
-                // Можна оновити сторінку після завершення перегляду
-                console.log('Плеєр закрито');
-            }
-        });
-
-        // Також слухаємо подію зміни прогресу
-        Lampa.Listener.follow('timeline', function (e) {
-            if (e.type === 'update') {
-                console.log('Оновлено прогрес:', e.data);
-            }
+                addContinueButton(movie);
+            }, 600);
         });
     }
 
-    // Ініціалізація плагіна
     if (window.Lampa) {
         if (Lampa.Listener) {
             init();
@@ -273,5 +234,4 @@
         document.addEventListener('lampa', init);
     }
 
-    console.log('🚀 Плагін "Продовжити перегляд" завантажено');
 })();
