@@ -72,19 +72,28 @@
         const button = document.createElement('div');
         button.className = 'full-start__button selector button--continue';
         button.style.display = 'flex';
-        button.style.flexDirection = 'column'; // вертикально
+        button.style.flexDirection = 'column'; // загальна кнопка вертикально
         button.style.alignItems = 'center';
         button.style.justifyContent = 'center';
-        button.style.gap = '2px'; // відступ між текстом і підписом
-        button.innerHTML = `
+        button.style.gap = '2px'; // відстань між верхнім і нижнім блоком
+        
+        // Верхній блок: іконка + текст
+        const top = document.createElement('div');
+        top.style.display = 'flex';
+        top.style.alignItems = 'center';
+        top.style.gap = '4px'; // відстань між іконкою і текстом
+        
+        top.innerHTML = `
             <svg viewBox="0 0 24 24" width="24" height="24">
                 <path fill="currentColor" d="M8 5v14l11-7z"/>
             </svg>
             <span class="continue-main">Продовжити</span>
-            <div class="continue-subtext">${displayText}</div>
         `;
-
-        const sub = button.querySelector('.continue-subtext');
+        
+        // Нижній блок: додаткова інформація
+        const sub = document.createElement('div');
+        sub.className = 'continue-subtext';
+        sub.textContent = displayText;
         sub.style.cssText = `
             font-size: 11px;
             opacity: 0.7;
@@ -93,6 +102,11 @@
             overflow: hidden;
             text-overflow: ellipsis;
         `;
+        
+        // Додаємо обидва блоки в кнопку
+        button.appendChild(top);
+        button.appendChild(sub);
+
 
         button.addEventListener('hover:enter', ()=>playMovie(movie, season, episode, time));
         button.addEventListener('click', ()=>playMovie(movie, season, episode, time));
