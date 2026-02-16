@@ -14,6 +14,32 @@
         return Lampa.Utils.hash(movie.original_title || movie.title);
     }
 
+    function toNumber(value, fallback = 0) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+    }
+
+    function normalizeTitle(title) {
+        return String(title || '').trim().toLowerCase();
+    }
+
+    function getProgressTimestamp(progress) {
+        return toNumber(
+            progress.updated || progress.update || progress.timestamp || progress.date || progress.created,
+            0
+        );
+    }
+
+    function getResumeTime(progress) {
+        return toNumber(progress.time, toNumber(progress.last_time, 0));
+    }
+
+    function formatEpisodeLabel(season, episode) {
+        const seasonValue = String(toNumber(season, 0)).padStart(2, '0');
+        const episodeValue = String(toNumber(episode, 0)).padStart(2, '0');
+        return `S${seasonValue}E${episodeValue}`;
+    }
+
     // Функція для отримання всіх збережених прогрессів
     function getAllSavedProgress() {
         try {
@@ -37,32 +63,44 @@
     function findLastWatchedForSerial(movie) {
         try {
             const savedProgress = getAllSavedProgress();
-            const originalName = movie.original_name || movie.title || movie.original_title;
+            const knownTitles = [movie.original_name, movie.title, movie.original_title]
+                .map(normalizeTitle)
+                .filter(Boolean);
             
-            if (!originalName) return null;
+            if (!knownTitles.length) return null;
             
-            console.log('Пошук для серіалу:', originalName);
+            console.log('Пошук для серіалу:', knownTitles);
             
             let lastWatched = null;
-            let maxTime = 0;
+            let bestTimestamp = -1;
+            let bestTime = -1;
             
             // Перебираємо всі збережені прогреси
             for (let hash in savedProgress) {
                 const progress = savedProgress[hash];
+                if (!progress) continue;
+
+                const progressTitle = normalizeTitle(progress.movie || progress.title || progress.original_name || progress.original_title);
+                const season = toNumber(progress.season, 0);
+                const episode = toNumber(progress.episode, 0);
+                const resumeTime = getResumeTime(progress);
+                const percent = toNumber(progress.percent, 0);
+                const timestamp = getProgressTimestamp(progress);
                 
                 // Перевіряємо чи це епізод нашого серіалу
-                if (progress && progress.movie === originalName) {
+                if (knownTitles.includes(progressTitle) && season > 0 && episode > 0 && resumeTime > 0) {
                     console.log('Знайдено епізод:', progress, 'hash:', hash);
                     
-                    // Якщо це новіший епізод або більший час
-                    if (progress.last_time > maxTime) {
-                        maxTime = progress.last_time;
+                    // Пріоритет: остання дата оновлення, потім час перегляду
+                    if (timestamp > bestTimestamp || (timestamp === bestTimestamp && resumeTime > bestTime)) {
+                        bestTimestamp = timestamp;
+                        bestTime = resumeTime;
                         lastWatched = {
                             hash: hash,
-                            season: progress.season || 1,
-                            episode: progress.episode || 1,
-                            time: progress.time || 0,
-                            percent: progress.percent || 0
+                            season: season,
+                            episode: episode,
+                            time: resumeTime,
+                            percent: percent
                         };
                     }
                 }
@@ -95,7 +133,7 @@
             if (season && episode) {
                 hash = getEpisodeHash(season, episode, originalName);
                 state = Lampa.Timeline.view(hash);
-                displayInfo = `S${season}E${episode}`;
+                displayInfo = formatEpisodeLabel(season, episode);
             } else {
                 // Шукаємо останній переглянутий епізод
                 const lastWatched = savedState || findLastWatchedForSerial(movie);
@@ -106,7 +144,7 @@
                         time: lastWatched.time,
                         percent: lastWatched.percent
                     };
-                    displayInfo = `S${lastWatched.season}E${lastWatched.episode}`;
+                    displayInfo = formatEpisodeLabel(lastWatched.season, lastWatched.episode);
                     
                     // Оновлюємо season/episode для запуску
                     season = lastWatched.season;
@@ -127,7 +165,7 @@
 
         // Форматуємо текст прогресу
         let subText = '';
-        if (state.percent > 0) {
+        if (state.time > 0) {
             const totalSeconds = state.time;
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -142,7 +180,8 @@
                 timeString = `${seconds}сек`;
             }
             
-            subText = `${displayInfo ? displayInfo + ' • ' : ''}${Math.round(state.percent)}% • ${timeString}`;
+            const percentText = state.percent > 0 ? `${Math.round(state.percent)}% • ` : '';
+            subText = `${displayInfo ? displayInfo + ' • ' : ''}${percentText}${timeString}`;
         }
 
         console.log('Додаємо кнопку з даними:', {
