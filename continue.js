@@ -106,6 +106,42 @@
         return state || null;
     }
 
+    function getLatestMovieStateByTitle(movie) {
+        const history = loadOwnHistory();
+        const knownTitles = [movie.original_title, movie.title, movie.original_name]
+            .map(normalizeTitle)
+            .filter(Boolean);
+
+        if (!knownTitles.length) return null;
+
+        let best = null;
+        let bestTimestamp = -1;
+
+        const items = Object.values(history.items);
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (!item) continue;
+
+            const season = toNumber(item.season, 0);
+            const episode = toNumber(item.episode, 0);
+            if (season > 0 || episode > 0) continue;
+
+            const itemTitle = normalizeTitle(item.original_title || item.title || item.movie || item.original_name);
+            if (!itemTitle || !knownTitles.includes(itemTitle)) continue;
+
+            const time = getResumeTime(item);
+            if (!time) continue;
+
+            const timestamp = getProgressTimestamp(item);
+            if (timestamp > bestTimestamp) {
+                bestTimestamp = timestamp;
+                best = item;
+            }
+        }
+
+        return best;
+    }
+
     // Функція для пошуку останнього переглянутого епізоду серіалу у ВЛАСНІЙ історії
     function findLastWatchedForSerial(movie) {
         try {
@@ -227,6 +263,15 @@
         } else {
             hash = getMovieHash(movie);
             state = getSavedStateByHash(hash);
+
+            // fallback: у timeline/update назва може відрізнятись від назви на сторінці фільму
+            if (!state || !state.time) {
+                const latestMovieState = getLatestMovieStateByTitle(movie);
+                if (latestMovieState) {
+                    hash = latestMovieState.hash;
+                    state = latestMovieState;
+                }
+            }
         }
 
         if (!state || !state.time || state.time === 0) {
