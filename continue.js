@@ -16,10 +16,10 @@
         if (!container) return;
         if (document.querySelector('.button--continue')) return;
 
+        // Визначення серіалу чи фільму
         const isSerial = 
-    (movie.number_of_seasons && movie.number_of_seasons > 0) ||
-    Boolean(movie.first_air_date);
-
+            (movie.number_of_seasons && movie.number_of_seasons > 0) ||
+            Boolean(movie.first_air_date);
 
         let displayText = '';
         let time = 0;
@@ -27,7 +27,7 @@
         let season, episode;
 
         if (isSerial) {
-            // ==== Логіка з перевіреного коду ====
+            // ==== Серіал ====
             const activity = Lampa.Activity.active();
             if(!activity || !activity.card) return;
 
@@ -56,10 +56,12 @@
             episode = lastEpisode.episode;
             time = lastEpisode.time;
             percent = lastEpisode.percent;
+
+            // Підпис під кнопкою
             displayText = `S${season}E${episode} • ${percent}% • ${formatTime(time)}`;
 
         } else {
-            // ==== Для фільмів ====
+            // ==== Фільм ====
             const hash = Lampa.Utils.hash(movie.original_title || movie.title);
             const state = Lampa.Timeline.view(hash);
             if(!state || state.time <=0) return;
@@ -76,10 +78,11 @@
             <svg viewBox="0 0 24 24" width="24" height="24">
                 <path fill="currentColor" d="M8 5v14l11-7z"/>
             </svg>
-            <span>Продовжити перегляд</span>
+            <span class="continue-main">Продовжити</span>
             <div class="continue-subtext">${displayText}</div>
         `;
 
+        // Стилізація підпису
         const sub = button.querySelector('.continue-subtext');
         sub.style.cssText = `
             font-size: 11px;
@@ -103,7 +106,10 @@
     }
 
     function playMovie(movie, season, episode, time){
-        const isSerial = movie.type === 'serial' || movie.type === 'series' || movie.serial === true;
+        const isSerial = 
+            (movie.number_of_seasons && movie.number_of_seasons > 0) ||
+            Boolean(movie.first_air_date);
+
         if(isSerial && season && episode){
             if(movie.seasons && movie.seasons[season-1]){
                 const epData = movie.seasons[season-1].episodes[episode-1];
