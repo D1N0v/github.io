@@ -14,6 +14,7 @@
     // ===== Перехоплюємо Player.play, щоб зберігати джерело =====
     if(Lampa && Lampa.Player){
         const originalPlay = Lampa.Player.play;
+    
         Lampa.Player.play = function(movie, time, params){
             try {
                 const url = (params && (params.url || params.file || params.stream)) || movie.url || null;
@@ -21,38 +22,41 @@
                     const viewed = Lampa.Storage.get('file_view') || {};
                     const originalName = movie.original_name || movie.original_title || movie.title;
                     let hash;
-
-                    if(params && params.season && params.episode){
-                        // Серіал
-                        hash = Lampa.Utils.hash([params.season, params.season>10?':':'', params.episode, originalName].join(''));
+    
+                    const percentValue = (params && params.percent) || 0;
+                    const seasonValue = (params && params.season) || 0;
+                    const episodeValue = (params && params.episode) || 0;
+    
+                    if(seasonValue && episodeValue){
+                        hash = Lampa.Utils.hash([seasonValue, seasonValue>10?':':'', episodeValue, originalName].join(''));
                         viewed[hash] = {
                             time: time || 0,
-                            percent: params.percent || 0,
+                            percent: percentValue,
                             source: url,
-                            season: params.season,
-                            episode: params.episode
+                            season: seasonValue,
+                            episode: episodeValue
                         };
                     } else {
-                        // Фільм
                         hash = Lampa.Utils.hash(originalName);
                         viewed[hash] = {
                             time: time || 0,
-                            percent: params.percent || 0,
+                            percent: percentValue,
                             source: url
                         };
                     }
-
+    
                     Lampa.Storage.set('file_view', viewed);
                     console.log("💾 Збережено URL для продовження:", url);
                 }
             } catch(err){
                 console.warn("⚠️ Помилка збереження URL:", err);
             }
-
+    
             return originalPlay.apply(this, arguments);
         };
         console.log("✅ Перехоплення Player.play активовано");
     }
+
 
     // ===== Створення кнопки «Продовжити» =====
     function addContinueButton(movie) {
