@@ -24,9 +24,9 @@
         let time = 0;
         let percent = 0;
         let season, episode;
+        let sourceLink = null;
 
         if (isSerial) {
-            // ==== Логіка останньої переглянутої серії ====
             const activity = Lampa.Activity.active();
             if(!activity || !activity.card) return;
 
@@ -43,7 +43,7 @@
                     const progress = viewed[hash];
                     if(progress && progress.time>0){
                         if(!lastEpisode || s>lastEpisode.season || (s===lastEpisode.season && e>lastEpisode.episode)){
-                            lastEpisode = {season:s, episode:e, time:progress.time, percent:progress.percent};
+                            lastEpisode = {season:s, episode:e, time:progress.time, percent:progress.percent, source: progress.source};
                         }
                     }
                 }
@@ -55,33 +55,32 @@
             episode = lastEpisode.episode;
             time = lastEpisode.time;
             percent = lastEpisode.percent;
+            sourceLink = lastEpisode.source || null;
             displayText = `S${season}E${episode} • ${percent}% • ${formatTime(time)}`;
 
         } else {
-            // ==== Для фільмів ====
             const hash = Lampa.Utils.hash(movie.original_title || movie.title);
             const state = Lampa.Timeline.view(hash);
             if(!state || state.time <=0) return;
 
             time = state.time;
             percent = state.percent;
+            sourceLink = state.source || null;
             displayText = `${percent}% • ${formatTime(time)}`;
         }
 
-        // ==== Створення кнопки ====
         const button = document.createElement('div');
         button.className = 'full-start__button selector button--continue';
         button.style.display = 'flex';
-        button.style.flexDirection = 'column'; // загальна кнопка вертикально
+        button.style.flexDirection = 'column';
         button.style.alignItems = 'center';
         button.style.justifyContent = 'center';
-        button.style.gap = '2px'; // відстань між верхнім і нижнім блоком
+        button.style.gap = '2px';
         
-        // Верхній блок: іконка + текст
         const top = document.createElement('div');
         top.style.display = 'flex';
         top.style.alignItems = 'center';
-        top.style.gap = '4px'; // відстань між іконкою і текстом
+        top.style.gap = '4px';
         
         top.innerHTML = `
             <svg viewBox="0 0 24 24" width="24" height="24">
@@ -90,7 +89,6 @@
             <span class="continue-main">Продовжити</span>
         `;
         
-        // Нижній блок: додаткова інформація
         const sub = document.createElement('div');
         sub.className = 'continue-subtext';
         sub.textContent = displayText;
@@ -103,13 +101,12 @@
             text-overflow: ellipsis;
         `;
         
-        // Додаємо обидва блоки в кнопку
         button.appendChild(top);
         button.appendChild(sub);
 
-
-        button.addEventListener('hover:enter', ()=>playMovie(movie, season, episode, time));
-        button.addEventListener('click', ()=>playMovie(movie, season, episode, time));
+        // Встановлюємо подію відтворення з джерелом
+        button.addEventListener('hover:enter', ()=>playMovie(movie, season, episode, time, sourceLink));
+        button.addEventListener('click', ()=>playMovie(movie, season, episode, time, sourceLink));
 
         const existingButtons = container.querySelectorAll('.full-start__button');
         if(existingButtons.length>0) container.insertBefore(button, existingButtons[0]);
@@ -118,21 +115,45 @@
         console.log(`✅ Кнопка "Продовжити" додана для ${isSerial?'серіалу':'фільму'}`);
     }
 
-    function playMovie(movie, season, episode, time){
+    function playMovie(movie, season, episode, time, source){
         const isSerial = movie.type === 'serial' || movie.type === 'series' || movie.serial === true;
+
+        const options = {season, episode, episode_data: undefined};
+        if(source) options.source = source; // додаємо джерело
+
         if(isSerial && season && episode){
             if(movie.seasons && movie.seasons[season-1]){
                 const epData = movie.seasons[season-1].episodes[episode-1];
-                if(epData){
-                    Lampa.Player.play(movie, time, {season, episode, episode_data: epData});
-                    return;
-                }
+                if(epData) options.episode_data = epData;
             }
-            Lampa.Player.play(movie, time, {season, episode});
+            Lampa.Player.play(movie, time, options);
         } else {
-            Lampa.Player.play(movie, time);
+            Lampa.Player.play(movie, time, options);
         }
     }
+
+    // Під час відтворення зберігаємо джерело
+    Lampa.Listener.follow('player_start', e=>{
+        const movie = e.data.movie;
+        const time = e.data.time || 0;
+        const percent = e.data.percent || 0;
+        const source = e.data.source || null;
+        const season = e.data.season;
+        const episode = e.data.episode;
+
+        if(movie && time>0){
+            const originalName = movie.original_name || movie.original_title || movie.title;
+            if(originalName){
+                const viewed = Lampa.Storage.get('file_view') || {};
+                const hash = season && episode
+                    ? Lampa.Utils.hash([season, season>10?':':'', episode, originalName].join(''))
+                    : Lampa.Utils.hash(originalName);
+
+                viewed[hash] = {time, percent, source};
+                Lampa.Storage.set('file_view', viewed);
+            }
+        }
+    });
 
     function init(){
         Lampa.Listener.follow('full', e=>{
@@ -149,5 +170,5 @@
         document.addEventListener('lampa', init);
     }
 
-    console.log('🚀 Плагін "Продовжити" завантажено');
+    console.log('🚀 Плагін "Продовжити" із збереженням джерела завантажено');
 })();
